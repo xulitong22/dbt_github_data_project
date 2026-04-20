@@ -10,6 +10,7 @@ renamed as (
         title,
         user.login as author_username,
         user.id as author_id,
+        author_association,
         cast(created_at as timestamp) as created_at,
         cast(updated_at as timestamp) as updated_at,
         cast(closed_at as timestamp) as closed_at,
