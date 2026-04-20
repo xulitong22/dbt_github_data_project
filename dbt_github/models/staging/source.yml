@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: github_raw
+    description: "Raw data extracted from GitHub API"
+    schema: raw_github_data
+    tables:
+      - name: pull_requests
+      - name: issues
