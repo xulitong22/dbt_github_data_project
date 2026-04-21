@@ -24,7 +24,6 @@ final as(
         p.state,
         p.title,
         u.user_type,
-        u.author_username,
         u.author_association,
 
         p.created_at,
