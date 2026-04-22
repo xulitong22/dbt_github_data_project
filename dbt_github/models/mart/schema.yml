@@ -1,0 +1,57 @@
+version: 2
+
+models:
+  - name: dim_users
+    description: "Unique list of all GitHub users (humans and bots) across issues and PRs."
+    columns:
+      - name: author_id
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_labels
+    description: "Unique list of all labels used in the repository, identified by a surrogate key."
+    columns:
+      - name: label_key
+        tests:
+          - unique
+          - not_null
+
+  - name: fct_pull_requests
+    description: "One row per PR-Issue link. Contains merge and closure metrics."
+    columns:
+      - name: pr_id
+        tests:
+          - not_null
+      - name: author_id
+        tests:
+          - relationships:
+              to: ref('dim_users')
+              field: author_id
+      - name: hours_to_merge
+        description: "Time in hours from creation to merge. Will be null if not merged."
+
+  - name: fct_issues
+    description: "One row per issue. Contains resolution metrics."
+    columns:
+      - name: issue_id
+        tests:
+          - unique
+          - not_null
+      - name: author_id
+        tests:
+          - relationships:
+              to: ref('dim_users')
+              field: author_id
+
+  - name: fct_item_labels
+    description: "Bridge table connecting Pull Requests and Issues to their various labels."
+    columns:
+      - name: item_id
+        tests:
+          - not_null
+      - name: label_key
+        tests:
+          - relationships:
+              to: ref('dim_labels')
+              field: label_key
