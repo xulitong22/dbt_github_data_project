@@ -1,5 +1,8 @@
 # GitHub Development Velocity Analytics
 
+<p align="center">
+  <img src="assets/dashboard_preview.png" width="80%" />
+</p>
 
 ## 📌 Project Overview
 This project is an end-to-end Analytics Engineering pipeline designed to monitor and visualize repository health. It transforms raw, nested JSON data from the GitHub API into a clean, warehouse-ready Star Schema.
@@ -27,16 +30,19 @@ The core of this project follows a Medallion Architecture:
     - Facts: fct_pull_requests, fct_issues.
     - Dimensions: dim_users, dim_labels.
     - Bridge: fct_item_labels (Handles many-to-many labels).
-
+    
+<p align="center">
+  <img src="assets/lineage_graph.png" width="80%" />
+</p>
 
 ## 💡 Key Engineering Challenges & Solutions
 1. Handling Many-to-Many Relationships (Label Fan-out)
-Challenge: A single PR can have multiple labels. Joining labels directly to fact tables causes "fan-out," which artificially inflates count and duration metrics in BI tools.
-Solution: I implemented a Bridge Table (fct_item_labels). In the BI layer, I utilized Data Blending and DISTINCT logic in SQL to ensure that even if a PR has 5 labels, its "Average Hours to Merge" is only calculated once per label entity.
+- Challenge: A single PR can have multiple labels. Joining labels directly to fact tables causes "fan-out," which artificially inflates count and duration metrics in BI tools.
+- Solution: I implemented a Bridge Table (fct_item_labels). In the BI layer, I utilized Data Blending and DISTINCT logic in SQL to ensure that even if a PR has 5 labels, its "Average Hours to Merge" is only calculated once per label entity.
 
 2. Logic for is_bug Identification
-Challenge: GitHub doesn't have a "Bug" checkbox; it relies on labels. Labels can be null or change over time.
-Solution: I built a robust classification logic in dbt using COALESCE and subqueries to scan the label bridge table. If an item contains a label matching %bug%, it is flagged at the Silver layer. This allows for simple boolean filtering in the dashboard without complex joins.
+- Challenge: GitHub doesn't have a "Bug" checkbox; it relies on labels. Labels can be null or change over time.
+- Solution: I built a robust classification logic in dbt using COALESCE and subqueries to scan the label bridge table. If an item contains a label matching %bug%, it is flagged at the Silver layer. This allows for simple boolean filtering in the dashboard without complex joins.
 
 
 ## 📊 Key Metrics TrackedMetric
