@@ -30,7 +30,7 @@ The core of this project follows a Medallion Architecture:
     - Facts: fct_pull_requests, fct_issues.
     - Dimensions: dim_users, dim_labels.
     - Bridge: fct_item_labels (Handles many-to-many labels).
-    
+
 <p align="center">
   <img src="assets/lineage_graph.png" width="80%" />
 </p>
@@ -53,7 +53,7 @@ The core of this project follows a Medallion Architecture:
 - Community Contribution: Identifying external vs. internal work using author_association.
 
 
-🚀 Future RoadmapOrchestration: 
+## 🚀 Future RoadmapOrchestration: 
 - Implement Dagster or Airflow to automate the Python ingestion and dbt runs.
 - Scale: Expand the API loader to fetch data from multiple high-volume repositories (e.g., dbt-core or Kubernetes).
 
