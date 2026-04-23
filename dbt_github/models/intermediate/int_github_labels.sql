@@ -5,7 +5,7 @@ with item_with_labels as(
     labels
     from {{ref('stg_issues')}}
 
-    union all 
+    union all
 
     select
     pr_id as item_id,
