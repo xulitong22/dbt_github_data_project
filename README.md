@@ -53,8 +53,8 @@ The core of this project follows a Medallion Architecture:
 - Community Contribution: Identifying external vs. internal work using author_association.
 
 
-## 🚀 Future RoadmapOrchestration: 
-- Implement Dagster or Airflow to automate the Python ingestion and dbt runs.
+## 🚀 Future Roadmap
+- Orchestration: Implement Dagster or Airflow to automate the Python ingestion and dbt runs.
 - Scale: Expand the API loader to fetch data from multiple high-volume repositories (e.g., dbt-core or Kubernetes).
 
 
