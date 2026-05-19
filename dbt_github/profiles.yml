@@ -5,9 +5,9 @@ dbt_github:
       dataset: "{{ env_var('BIGQUERY_DATASET') }}_dev"
       job_execution_timeout_seconds: 300
       job_retries: 1
-      keyfile: "{{ env_var('DBT_LOCAL_KEYFILE') }}"
+      keyfile_json: "{{ env_var('BIGQUERY_KEYFILE') | as_native }}"
       location: US
-      method: service-account
+      method: service-account-json
       priority: interactive
       project: "{{ env_var('GCP_PROJECT_ID') }}"
       threads: 4
