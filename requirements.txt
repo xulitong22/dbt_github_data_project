@@ -1,0 +1,4 @@
+dbt-bigquery~=1.11
+pandas~=2.3
+pandas-gbq~=0.35
+requests~=2.33
