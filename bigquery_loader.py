@@ -2,9 +2,18 @@ import pandas as pd
 import pandas_gbq
 import requests
 import os
+import json
+import tempfile
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "service-acount.json"
-project_id = "github-analytics-493513"
+#os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "service-acount.json"
+#project_id = "github-analytics-493513"
+
+keyfile_content = os.environ["BIGQUERY_KEYFILE"]
+project_id = os.environ["GCP_PROJECT_ID"]
+
+with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+    f.write(keyfile_content)
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = f.name
 
 def sync_github_endpoint(endpoint_name):
     """
