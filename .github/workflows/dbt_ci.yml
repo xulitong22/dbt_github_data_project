@@ -1,0 +1,60 @@
+name: dbt CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dbt-ci:
+    runs-on: ubuntu-latest
+    
+    env:
+      DBT_PROFILES_DIR: ./
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      BIGQUERY_DATASET: ${{ secrets.BIGQUERY_DATASET }}
+      BIGQUERY_KEYFILE: ${{ secrets.BIGQUERY_KEYFILE }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install dbt-bigquery==1.11.1
+          pip install sqlfluff==3.3.0
+          pip install sqlfluff-templater-dbt==3.3.0
+      
+      - name: Install dbt packages
+        run: dbt deps
+        working-directory: ./dbt_github 
+      
+      - name: Lint SQL with SQLFluff
+        run: sqlfluff lint models/ --dialect bigquery
+        working-directory: ./dbt_github
+        continue-on-error: true  
+      
+      - name: Compile dbt project
+        run: dbt compile --target dev
+        working-directory: ./dbt_github
+      
+      - name: Run dbt build (dev environment)
+        run: dbt build --target dev --fail-fast
+        working-directory: ./dbt_github
+      
+      - name: Generate dbt docs
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: dbt docs generate --target prod
+        working-directory: ./dbt_github

@@ -3,7 +3,7 @@ import pandas_gbq
 import requests
 import os
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "github-analytics-493513-fbbfd0791f68.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "service-acount.json"
 project_id = "github-analytics-493513"
 
 def sync_github_endpoint(endpoint_name):
