@@ -4,60 +4,182 @@
   <img src="assets/dashboard_preview.png" width="80%" />
 </p>
 
-## 📌 Project Overview
-This project is an end-to-end Analytics Engineering pipeline designed to monitor and visualize repository health. It transforms raw, nested JSON data from the GitHub API into a clean, warehouse-ready Star Schema.
+##  Project Overview
+An end-to-end Analytics Engineering pipeline that monitors and visualizes repository health for the GitHub repository. Transforms raw GitHub API data into a clean, warehouse-ready Star Schema with automated daily refreshes.
 
+---
 
-### Key Objective 
-To measure developer velocity (Time to Merge) and issue responsiveness, while handling the complex many-to-many relationships of GitHub labels.
+## Tech Stack
 
+| Layer | Tool |
+|---|---|
+| Ingestion | Python + `pandas-gbq` |
+| Data Warehouse | Google BigQuery |
+| Transformation | dbt (data build tool) |
+| Orchestration | GitHub Actions (CI + scheduled cron) |
+| Visualization | Looker Studio |
 
-## 🛠 The Tech Stack
-- Ingestion: Python (Custom API Loader)
-- Data Warehouse: Google BigQuery
-- Transformation: dbt (data build tool)
-- Visualization: Looker Studio
+---
 
+## Architecture
 
-## 🏗 Data Modeling & Architecture
-The core of this project follows a Medallion Architecture:
-1. Bronze (Raw): Landing zone for JSON payloads from GitHub issues and pulls endpoints.
-2. Silver (Intermediate): Heavy cleaning including:
-    - Regex parsing of PR descriptions to link Issues to Pull Requests.
-    - Standardizing timestamps for duration calculations.
-    - Flagging entities (e.g., is_bug, is_community_contribution).
-3. Gold (Marts): Optimized for reporting: 
-    - Facts: fct_pull_requests, fct_issues.
-    - Dimensions: dim_users, dim_labels.
-    - Bridge: fct_item_labels (Handles many-to-many labels).
+The pipeline follows a **Medallion Architecture** with three layers:
+
+```
+GitHub API
+    │
+    ▼
+🥉 Bronze (Raw)        — bigquery_loader.py → raw_github_data.*
+    │
+    ▼
+🥈 Silver (Intermediate) — dbt models: cleaning, parsing, flagging
+    │
+    ▼
+🥇 Gold (Marts)         — dbt models: fct_*, dim_* → Looker Studio
+```
+
+### Bronze — Ingestion
+Raw JSON payloads from the GitHub `/issues` and `/pulls` endpoints are loaded into BigQuery via a Python script using `pandas-gbq`. The loader runs daily via a GitHub Actions cron job.
+
+### Silver — Transformation
+Heavy cleaning and enrichment in dbt:
+- Regex parsing of PR descriptions to link Issues to Pull Requests
+- Timestamp standardization for duration calculations
+- Boolean flagging (`is_bug`, `is_community_contribution`)
+
+### Gold — Marts
+Optimized for reporting, following a Star Schema:
+
+| Model | Type | Description |
+|---|---|---|
+| `fct_pull_requests` | Fact | One row per PR–Issue link, with merge and closure metrics |
+| `fct_issues` | Fact | One row per issue, with resolution metrics |
+| `fct_item_labels` | Bridge | Many-to-many relationship between items and labels |
+| `dim_users` | Dimension | Unique GitHub users (humans and bots) |
+| `dim_labels` | Dimension | Unique labels used in the repository |
 
 <p align="center">
   <img src="assets/lineage_graph.png" width="80%" />
 </p>
 
-## 💡 Key Engineering Challenges & Solutions
-1. Handling Many-to-Many Relationships (Label Fan-out)
-- Challenge: A single PR can have multiple labels. Joining labels directly to fact tables causes "fan-out," which artificially inflates count and duration metrics in BI tools.
-- Solution: I implemented a Bridge Table (fct_item_labels). In the BI layer, I utilized Data Blending and DISTINCT logic in SQL to ensure that even if a PR has 5 labels, its "Average Hours to Merge" is only calculated once per label entity.
+---
 
-2. Logic for is_bug Identification
-- Challenge: GitHub doesn't have a "Bug" checkbox; it relies on labels. Labels can be null or change over time.
-- Solution: I built a robust classification logic in dbt using COALESCE and subqueries to scan the label bridge table. If an item contains a label matching %bug%, it is flagged at the Silver layer. This allows for simple boolean filtering in the dashboard without complex joins.
+## Data Quality Tests
 
+All Gold layer models are covered by dbt tests:
 
-## 📊 Key Metrics TrackedMetric
-- Hours to Merge: timestamp_diff(merged_at, created_at, HOUR).
+| Model | Tests |
+|---|---|
+| `dim_users` | `author_id`: unique, not_null |
+| `dim_labels` | `label_key`: unique, not_null |
+| `fct_pull_requests` | `pr_id`: not_null · `author_id`: referential integrity → `dim_users` |
+| `fct_issues` | `issue_id`: unique, not_null · `author_id`: referential integrity → `dim_users` |
+| `fct_item_labels` | `item_id`: not_null · `label_key`: referential integrity → `dim_labels` |
 
-- Is Bug Flag: A boolean derived by scanning labels for the 'bug' string, denormalized into fct_issues for performance.
+Tests run automatically on every pull request and push to `main` via the CI workflow. In production (`dbt build`), a model failing its tests will block all downstream models from running.
 
-- Community Contribution: Identifying external vs. internal work using author_association.
+---
 
+## CI/CD
 
-## 🚀 Future Roadmap
-- Orchestration: Implement Dagster or Airflow to automate the Python ingestion and dbt runs.
-- Scale: Expand the API loader to fetch data from multiple high-volume repositories (e.g., dbt-core or Kubernetes).
+Two GitHub Actions workflows are included:
 
+### `ci.yml` — Pull Request Checks
+Triggered on every PR and push to `main`:
+1. Install dependencies (`dbt-bigquery`, `sqlfluff`)
+2. Install dbt packages (`dbt deps`)
+3. Lint SQL with SQLFluff
+4. Run `dbt build --target dev` (models + tests)
+5. Generate dbt docs (on merge to `main` only)
 
-### How to Run
-1. Loader: python main.py (Requires GITHUB_TOKEN and GCP_CREDENTIALS).
-2. dbt: dbt build (Runs models, seeds, and tests).
+### `scheduled-pipeline.yml` — Daily Production Run
+Runs every day at 02:00 UTC via cron:
+1. Python ingestion script refreshes Bronze layer data in BigQuery
+2. `dbt build --target prod` rebuilds Silver and Gold layers
+3. All data quality tests run automatically
+
+---
+
+## Environments
+
+Two dbt targets are configured in `profiles.yml`:
+
+| Target | Dataset | Used by |
+|---|---|---|
+| `dev` | `dbt_github_analytics_dev` | Local development, CI checks |
+| `prod` | `dbt_github_analytics` | Daily scheduled pipeline |
+
+---
+
+## Key Engineering Challenges
+
+### Many-to-Many Label Relationships
+A single PR or issue can have multiple labels. Joining labels directly to fact tables causes metric fan-out (e.g., a PR with 5 labels would inflate its "Hours to Merge" count by 5x in BI tools).
+
+**Solution:** A bridge table (`fct_item_labels`) decouples labels from facts. In Looker Studio, Data Blending and `DISTINCT` logic ensure metrics like "Average Hours to Merge" are calculated once per item, regardless of how many labels it has.
+
+### Dynamic Bug Identification
+GitHub has no native "Bug" field — bug classification relies entirely on labels, which can be null or inconsistent.
+
+**Solution:** A `COALESCE` + subquery pattern in dbt scans the label bridge table at the Silver layer. Any item with a label matching `%bug%` is flagged as `is_bug = true`, denormalized into `fct_issues` to enable simple boolean filtering in the dashboard without complex joins at query time.
+
+---
+
+## Key Metrics
+
+- **Hours to Merge** — `TIMESTAMP_DIFF(merged_at, created_at, HOUR)`
+- **Is Bug** — Boolean derived from label scanning, denormalized for performance
+- **Community Contribution** — External vs. internal work identified via `author_association`
+
+---
+
+## Local Setup
+
+### Prerequisites
+- Python 3.11+
+- A Google Cloud service account with BigQuery access
+- A GitHub Personal Access Token (for higher API rate limits)
+
+### Installation
+
+```bash
+# Clone the repo
+git clone https://github.com/xulitong22/dbt_github_data_project.git
+cd dbt_github_data_project
+
+# Create and activate a virtual environment
+python -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your GCP project ID and service account credentials
+
+source .env
+```
+
+### Running the Pipeline
+
+```bash
+# 1. Load raw data into BigQuery
+python bigquery_loader.py
+
+# 2. Install dbt packages
+cd dbt_github
+dbt deps
+
+# 3. Run dbt (models + tests)
+dbt build --target dev
+```
+
+### Required GitHub Secrets (for CI/CD)
+
+| Secret | Description |
+|---|---|
+| `GCP_PROJECT_ID` | Your Google Cloud project ID |
+| `BIGQUERY_DATASET` | Target BigQuery dataset name |
+| `BIGQUERY_KEYFILE` | Full contents of your service account JSON |
+

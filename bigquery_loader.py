@@ -5,8 +5,6 @@ import os
 import json
 import tempfile
 
-#os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "service-acount.json"
-#project_id = "github-analytics-493513"
 
 keyfile_content = os.environ["BIGQUERY_KEYFILE"]
 project_id = os.environ["GCP_PROJECT_ID"]
@@ -20,7 +18,7 @@ def sync_github_endpoint(endpoint_name):
     endpoint_name can be 'pulls' or 'issues'
     """
     url = f"https://api.github.com/repos/dbt-labs/dbt-core/{endpoint_name}"
-    # Let's grab 200 of each to increase the chance of a match
+    
     all_data = []
     for page in [1, 2]:
         params = {"state": "all", "per_page": 100, "page": page}
@@ -36,6 +34,6 @@ def sync_github_endpoint(endpoint_name):
     print(f"Loading {len(df)} records into {table_id}...")
     pandas_gbq.to_gbq(df, table_id, project_id=project_id, if_exists='replace')
 
-# Run for both!
+
 sync_github_endpoint("pulls")
 sync_github_endpoint("issues")

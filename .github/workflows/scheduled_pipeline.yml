@@ -2,11 +2,8 @@ name: Scheduled Pipeline Run
 
 on:
   schedule:
-    # 每天 UTC 时间 02:00 跑（巴黎时间凌晨 3-4 点，看夏令时）
-    # cron 格式：minute hour day month day-of-week
     - cron: '0 2 * * *'
   
-  # 也允许手动触发，方便测试
   workflow_dispatch:
 
 concurrency:
@@ -21,7 +18,6 @@ jobs:
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
       BIGQUERY_DATASET: ${{ secrets.BIGQUERY_DATASET }}
       BIGQUERY_KEYFILE: ${{ secrets.BIGQUERY_KEYFILE }}
-      #GITHUB_API_TOKEN: ${{ secrets.GH_API_TOKEN }}
       DBT_PROFILES_DIR: ./
     
     steps:
